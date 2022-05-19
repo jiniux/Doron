@@ -3,6 +3,7 @@ using System.Buffers;
 using System.Collections.Generic;
 using System.IO.Pipelines;
 using System.Linq;
+using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
@@ -17,9 +18,19 @@ namespace Doron.Connections
         private Stream _inputStream;
         private Stream _outputStream;
 
+        public IPAddress? RemoteIPAddress { get; }
+        public int? RemotePort { get; }
+        
         public bool Available => _inputStream.CanRead && _outputStream.CanWrite;
 
-        public Connection(Socket socket) : this(new NetworkStream(socket, FileAccess.ReadWrite, ownsSocket: true)) {}
+        public Connection(Socket socket) : this(new NetworkStream(socket, FileAccess.ReadWrite, ownsSocket: true))
+        {
+            if (socket.RemoteEndPoint is IPEndPoint endPoint)
+            {
+                RemoteIPAddress = endPoint.Address;
+                RemotePort = endPoint.Port;
+            }
+        }
 
         public Connection(Stream stream) : this(stream, stream) {}
 
