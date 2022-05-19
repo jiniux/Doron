@@ -14,7 +14,7 @@ namespace Doron
         public abstract byte Opcode { get; }
         public abstract void CopyPayloadTo(Memory<byte> target);
 
-        public record Binary(ReadOnlyMemory<byte> Data) : WebSocketMessage
+        public record Binary(byte[] Data) : WebSocketMessage
         {
             public override int PayloadLength => Data.Length;
 
