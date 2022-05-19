@@ -83,7 +83,7 @@ namespace Doron.Connections
             return new WebSocketConnection(_connection);
         }
 
-        public ValueTask SendResponseHeaderAsync(HttpResponseHeader responseHeader) =>
+        public Task SendResponseHeaderAsync(HttpResponseHeader responseHeader) =>
             _connection.SendAsync(responseHeader.ToString());
 
         public async Task<HttpRequestHeader> ReceiveRequestHeaderAsync()

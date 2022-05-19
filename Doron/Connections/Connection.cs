@@ -23,6 +23,9 @@ namespace Doron.Connections
         
         public Guid Guid { get; }
 
+        public int ReceiveTimeout { get; set; } = 35000;
+        public int SendTimeout { get; set; } = 10000;
+
         public bool Available => _inputStream.CanRead && _outputStream.CanWrite;
 
         public Connection(Socket socket) : this(new NetworkStream(socket, FileAccess.ReadWrite, ownsSocket: true))
@@ -38,14 +41,14 @@ namespace Doron.Connections
 
         public Connection(Stream stream) : this(stream, stream) {}
 
-        public async ValueTask SendAsync(ReadOnlyMemory<byte> memory) =>
-            await _outputStream.WriteAsync(memory);
+        public Task SendAsync(ReadOnlyMemory<byte> memory) =>
+             _outputStream.WriteAsync(memory).RunWithTimeout(SendTimeout);
 
-        public ValueTask SendAsync(string data) =>
+        public Task SendAsync(string data) =>
             this.SendAsync(data, Encoding.ASCII);
 
-        public ValueTask SendAsync(string data, Encoding encoding) =>
-            _outputStream.WriteAsync(encoding.GetBytes(data));
+        public Task SendAsync(string data, Encoding encoding) =>
+            _outputStream.WriteAsync(encoding.GetBytes(data)).RunWithTimeout(SendTimeout);
 
         public Connection(Stream inputStream, Stream outputStream)
         {
@@ -61,7 +64,7 @@ namespace Doron.Connections
 
             while (true)
             {
-                ReadResult result = await _reader.ReadAsync();
+                ReadResult result = await _reader.ReadAsync().RunWithTimeout(ReceiveTimeout);
                 ReadOnlySequence<byte> buffer = result.Buffer;
 
                 SequencePosition? endLinePosition = buffer.PositionOf((byte)'\n');
@@ -89,7 +92,7 @@ namespace Doron.Connections
 
         public async ValueTask ReadExact(Memory<byte> outBuffer)
         {
-            ReadResult result = await _reader.ReadAtLeastAsync(outBuffer.Length);
+            ReadResult result = await _reader.ReadAtLeastAsync(outBuffer.Length).RunWithTimeout(ReceiveTimeout);
             ReadOnlySequence<byte> buffer = result.Buffer;
 
             if (buffer.Length == 0)
