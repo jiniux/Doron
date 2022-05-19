@@ -22,6 +22,8 @@ namespace Doron.Connections
             _connection = connection;
         }
 
+        public Connection RawConnection => _connection;
+
         public ValueTask<WebSocketActionResult<EmptyRef>> SendMessageAsync(WebSocketMessage message) =>
             HandleAction(async () =>
             {
