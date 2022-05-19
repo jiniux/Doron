@@ -7,6 +7,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
+using Doron.Types;
 
 namespace Doron.Connections
 {
@@ -14,12 +15,21 @@ namespace Doron.Connections
     {
         Connection _connection;
 
+        public int MaxMessageLength { get; set; } = int.MaxValue;
+
         public WebSocketConnection(Connection connection)
         {
             _connection = connection;
         }
 
-        public async Task SendMessageAsync(WebSocketMessage message)
+        public ValueTask<WebSocketActionResult<EmptyRef>> SendMessageAsync(WebSocketMessage message) =>
+            HandleAction(async () =>
+            {
+                await InternalSendMessageAsync(message);
+                return new EmptyRef();
+            });
+
+        private async Task InternalSendMessageAsync(WebSocketMessage message)
         {
             int payloadLength = message.PayloadLength;
             using IMemoryOwner<byte> messageBuffer = MemoryPool<byte>.Shared.Rent(10 + payloadLength);
@@ -99,12 +109,61 @@ namespace Doron.Connections
 
             return ExtendedBitConverter.UnsafeBEBytesToUShort(temp);
         }
+        
+        public enum WebSocketActionStatus : byte
+        {
+            Ok,
+            Exception,
+            ConnectionClosed
+        }
+        
+        public readonly struct WebSocketActionResult<T> where T: class
+        {
+            internal WebSocketActionResult(WebSocketActionStatus status, Exception? exception = null, T? result = null)
+            {
+                Status = status;
+                Exception = exception;
+                Result = result;
+            } 
 
-        public async Task<WebSocketMessage> ReceiveMessage()
+            public WebSocketActionStatus Status { get; }
+            public Exception? Exception { get; }
+            public T? Result { get; }
+        }
+
+        private async ValueTask<WebSocketActionResult<TK>> HandleAction<TK>(Func<ValueTask<TK>> action) where TK: class
+        {
+            if (!_connection.Available)
+                return new WebSocketActionResult<TK>(WebSocketActionStatus.ConnectionClosed);
+
+            TK result;
+            try
+            {
+                result = await action();
+            }
+            catch (Exception exception)
+            {
+                _connection.Dispose();
+                
+                if (exception is IOException or EndOfStreamException)
+                    return new WebSocketActionResult<TK>(WebSocketActionStatus.ConnectionClosed);
+
+                return new WebSocketActionResult<TK>(WebSocketActionStatus.Exception, exception: exception);
+            }
+
+            return new WebSocketActionResult<TK>(WebSocketActionStatus.Ok, result: result);
+        }
+
+        public ValueTask<WebSocketActionResult<WebSocketMessage>> ReceiveMessageAsync() => 
+            HandleAction(async () => await InternalReceiveMessageAsync());
+
+        private async Task<WebSocketMessage> InternalReceiveMessageAsync()
         {
             using IMemoryOwner<byte> headerBuffer = MemoryPool<byte>.Shared.Rent(14);
             MemoryOwnerSegment<byte>? firstPayloadSegment = null, lastPayloadSegment = null;
 
+            int maxLength = MaxMessageLength;
+            
             int? initialOpcode = null;
 
             try
@@ -153,7 +212,12 @@ namespace Doron.Connections
                         }
                         else
                             length = header.LengthFlag;
+                        
+                        if (length > maxLength)
+                            throw new InvalidDataException("Message too long.");
 
+                        maxLength -= length;
+                        
                         await _connection.ReadExact(maskData);
                     }
 

@@ -17,7 +17,9 @@ namespace Doron.Connections
         private Stream _inputStream;
         private Stream _outputStream;
 
-        public Connection(Socket socket) : this(new NetworkStream(socket)) {}
+        public bool Available => _inputStream.CanRead && _outputStream.CanWrite;
+
+        public Connection(Socket socket) : this(new NetworkStream(socket, FileAccess.ReadWrite, ownsSocket: true)) {}
 
         public Connection(Stream stream) : this(stream, stream) {}
 
@@ -50,9 +52,7 @@ namespace Doron.Connections
                 SequencePosition? endLinePosition = buffer.PositionOf((byte)'\n');
                 SequencePosition endPosition = endLinePosition != null ? buffer.GetPosition(1, endLinePosition.Value) : buffer.End;
 
-                ReadOnlySequence<byte> sequence;
-
-                sequence = buffer.Slice(0, endPosition);
+                ReadOnlySequence<byte> sequence = buffer.Slice(0, endPosition);
 
                 if (sequence.Length > limit)
                     throw new FormatException("Line is too long");
@@ -75,7 +75,10 @@ namespace Doron.Connections
         public async ValueTask ReadExact(Memory<byte> outBuffer)
         {
             ReadResult result = await _reader.ReadAtLeastAsync(outBuffer.Length);
-            ReadOnlySequence<byte> buffer = result.Buffer;  
+            ReadOnlySequence<byte> buffer = result.Buffer;
+
+            if (buffer.Length == 0)
+                throw new EndOfStreamException();
 
             buffer.Slice(0, outBuffer.Length).CopyTo(outBuffer.Span);
 

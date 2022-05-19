@@ -18,7 +18,15 @@ namespace Doron.Tests
             using MemoryStream stream = new MemoryStream(new byte[] { 129, 131, 61, 84, 35, 6, 112, 16, 109 });
             Connection connection = new Connection(stream);
 
-            WebSocketMessage message = await new WebSocketConnection(connection).ReceiveMessage();
+            WebSocketConnection.WebSocketActionResult<WebSocketMessage> actionResult = await new WebSocketConnection(connection).ReceiveMessageAsync();
+            Assert.AreEqual(actionResult.Status, WebSocketConnection.WebSocketActionStatus.Ok);
+            Assert.IsTrue(actionResult.Result is WebSocketMessage.Text);
+
+            WebSocketMessage.Text message = (WebSocketMessage.Text) actionResult.Result!;
+            
+            Assert.AreEqual(message.Opcode, 1);
+            Assert.AreEqual(message.PayloadLength, 3);
+            Assert.AreEqual(message.Data, "MDN");
         }
     }
 }
