@@ -21,10 +21,14 @@ namespace Doron.Connections
         public IPAddress? RemoteIPAddress { get; }
         public int? RemotePort { get; }
         
+        public Guid Guid { get; }
+
         public bool Available => _inputStream.CanRead && _outputStream.CanWrite;
 
         public Connection(Socket socket) : this(new NetworkStream(socket, FileAccess.ReadWrite, ownsSocket: true))
         {
+            Guid = Guid.NewGuid();
+            
             if (socket.RemoteEndPoint is IPEndPoint endPoint)
             {
                 RemoteIPAddress = endPoint.Address;
