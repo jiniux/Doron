@@ -80,7 +80,7 @@ namespace Doron.Connections
                 }
             ).ToString());
 
-            return new WebSocketConnection(_connection);
+            return new WebSocketConnection(_connection, requestHeader);
         }
 
         public Task SendResponseHeaderAsync(HttpResponseHeader responseHeader) =>

@@ -17,8 +17,11 @@ namespace Doron.Connections
 
         public int MaxMessageLength { get; set; } = int.MaxValue;
         
-        public WebSocketConnection(Connection connection)
+        public HttpConnection.HttpRequestHeader RequestHeader { get; }
+        
+        public WebSocketConnection(Connection connection, HttpConnection.HttpRequestHeader requestHeader)
         {
+            RequestHeader = requestHeader;
             _connection = connection;
         }
 
